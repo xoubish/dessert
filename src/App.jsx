@@ -585,7 +585,7 @@ const CrowdRow = ({ label, value }) => (
 
 // ---------- Results Page ----------
 const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, parchmentBg }) => {
-  const rows = desserts.map(d => {
+  const scored = desserts.map((d, i) => {
     const list = votes[d.id] || [];
     const themeAvg = list.length ? avg(list.map(v => v.theme)) : 0;
     const flavorAvg = list.length ? avg(list.map(v => v.flavor)) : 0;
@@ -596,8 +596,13 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
       combined: themeAvg * 0.25 + flavorAvg * 0.75,
       voteCount: list.length,
       comments: list.filter(v => v.comment).map(v => v.comment),
+      submissionNo: i + 1,
     };
-  }).sort((a,b) => b.combined - a.combined);
+  });
+  const byScore = [...scored].sort((a, b) => b.combined - a.combined);
+  const top3 = byScore.slice(0, 3);
+  const rest = byScore.slice(3).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const rows = [...top3, ...rest];
 
   return (
     <div style={{...parchmentBg, fontFamily: baseFont}} className="min-h-screen">
@@ -619,13 +624,14 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
         <div className="space-y-4">
           {rows.map((r, i) => (
             <div key={r.id} className="bg-[#FAF5E8] border border-stone-400/60 rounded-sm p-5 flex gap-5 items-start">
-              <div className="flex-shrink-0 text-center w-14">
-                <div style={{fontFamily: scriptFont, color: i===0 ? '#B8860B' : i===1 ? '#7B1E1E' : '#2A1810'}} className="text-5xl leading-none">
-                  {i+1}
-                </div>
-                {i < 3 && (
-                  <div className="text-xs tracking-widest uppercase mt-1" style={{color: i===0 ? '#B8860B' : '#7B1E1E'}}>
+              <div className="flex-shrink-0 text-center w-16">
+                {i < 3 ? (
+                  <div style={{fontFamily: scriptFont, color: i===0 ? '#B8860B' : i===1 ? '#7B1E1E' : '#2A1810'}} className="text-3xl leading-tight">
                     {['Gold','Silver','Bronze'][i]}
+                  </div>
+                ) : (
+                  <div className="text-xs tracking-[0.25em] text-stone-600 mt-2">
+                    N<sup>o</sup> {String(r.submissionNo).padStart(2,'0')}
                   </div>
                 )}
               </div>
@@ -636,8 +642,12 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
                 <div style={{color:'#2A1810'}} className="text-lg font-semibold leading-tight">{r.name}</div>
                 <div style={{fontFamily: scriptFont, color:'#7B1E1E'}} className="text-lg leading-tight">by {r.baker}</div>
                 <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-stone-600">
-                  <span>Theme <strong style={{fontFamily: scriptFont, color:'#B8860B', fontSize:'1.3em'}}>{r.themeAvg.toFixed(2)}</strong></span>
-                  <span>Flavor <strong style={{fontFamily: scriptFont, color:'#B8860B', fontSize:'1.3em'}}>{r.flavorAvg.toFixed(2)}</strong></span>
+                  {i < 3 && (
+                    <>
+                      <span>Theme <strong style={{fontFamily: scriptFont, color:'#B8860B', fontSize:'1.3em'}}>{r.themeAvg.toFixed(2)}</strong></span>
+                      <span>Flavor <strong style={{fontFamily: scriptFont, color:'#B8860B', fontSize:'1.3em'}}>{r.flavorAvg.toFixed(2)}</strong></span>
+                    </>
+                  )}
                   <span className="italic">{r.voteCount} {r.voteCount===1?'ballot':'ballots'}</span>
                 </div>
                 {r.comments.length > 0 && (
