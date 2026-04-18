@@ -593,7 +593,7 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
       ...d,
       themeAvg,
       flavorAvg,
-      combined: (themeAvg + flavorAvg) / 2,
+      combined: themeAvg * 0.25 + flavorAvg * 0.75,
       voteCount: list.length,
       comments: list.filter(v => v.comment).map(v => v.comment),
     };
@@ -612,7 +612,7 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
             Standings
           </h1>
           <div style={{fontFamily: scriptFont, color:'#B8860B'}} className="text-2xl mt-2">
-            ranked by combined theme &amp; flavor
+            ranked by flavor (¾) &amp; theme (¼)
           </div>
         </div>
 
