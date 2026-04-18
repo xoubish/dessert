@@ -116,7 +116,7 @@ export default function App() {
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search);
-      if (p.get('admin') === 'spherex') setIsAdmin(true);
+      if (p.get('admin') === 'shooby') setIsAdmin(true);
     } catch {}
   }, []);
 

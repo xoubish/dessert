@@ -49,7 +49,7 @@ In the [Firebase Console](https://console.firebase.google.com):
 
 ## Admin
 
-Add `?admin=spherex` to the URL to unlock the admin page for adding/deleting entries.
+Add `?admin=shooby` to the URL to unlock the admin page for adding/deleting entries.
 
 ## Deploy to Firebase Hosting
 
