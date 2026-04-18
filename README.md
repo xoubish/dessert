@@ -10,6 +10,7 @@ Vite + React + Tailwind, data in Firebase Firestore, deploys as a static site to
 - **lucide-react** — icons
 - **Google Fonts** (Fraunces, Caveat) — loaded in `index.html`
 - **Firebase Firestore** — shared storage for desserts and votes
+- **Firebase Hosting** — serves the built static site
 - **localStorage** — personal state (voter id + which desserts this browser has voted on)
 
 ## Prerequisites
@@ -50,19 +51,27 @@ In the [Firebase Console](https://console.firebase.google.com):
 
 Add `?admin=spherex` to the URL to unlock the admin page for adding/deleting entries.
 
-## Deploy to GitHub Pages
+## Deploy to Firebase Hosting
 
-`vite.config.js` uses `base: './'`, so the built `dist/` works at any subpath without further configuration.
+The site deploys to the same Firebase project that holds the Firestore data, so one dashboard, one URL.
 
-1. Push this repo to GitHub.
-2. Deploy:
-   ```bash
-   npm run deploy
-   ```
-   This builds and pushes `dist/` to the `gh-pages` branch via the `gh-pages` package.
-3. In the repo **Settings → Pages**, set source to the `gh-pages` branch (root). The site will be published at `https://<you>.github.io/<repo>/`.
+One-time setup:
+```bash
+npx firebase login      # opens a browser, auth with the Google account that owns the project
+```
 
-Subsequent deploys: re-run `npm run deploy`.
+Then to ship a build:
+```bash
+npm run deploy
+```
+
+This runs `vite build` and then `firebase deploy --only hosting`. The site will be published at:
+- `https://ipac-bakeoff.web.app`
+- `https://ipac-bakeoff.firebaseapp.com`
+
+(both URLs point at the same site — pick whichever you prefer to share.)
+
+The target project is pinned in [`.firebaserc`](./.firebaserc) to `ipac-bakeoff`. Hosting config is in [`firebase.json`](./firebase.json) — it serves `dist/` as static and rewrites all paths to `/index.html` so the SPA works.
 
 > **Env vars at deploy time:** `npm run deploy` reads `.env.local` during the build. The Firebase web API key ends up in the bundled JS — that's normal for web apps, but it means you should enforce access rules in Firestore (and/or App Check), not rely on the key being secret.
 
