@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Plus, X, Check, ArrowLeft, Trophy, Upload, Trash2, RefreshCw, Sparkles } from 'lucide-react';
+import {
+  getVoterId,
+  markVotedLocal,
+  fetchDesserts,
+  fetchVotes,
+  saveDessert,
+  saveVote,
+  deleteDessertById,
+} from './storage';
 
 // ---------- Helpers ----------
 
@@ -123,35 +132,16 @@ export default function App() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Voter ID — personal storage
-      let vid;
-      try {
-        const r = await window.storage.get('voter_id', false);
-        vid = r.value;
-      } catch {
-        vid = 'v_' + Math.random().toString(36).slice(2, 11) + '_' + Date.now();
-        await window.storage.set('voter_id', vid, false);
-      }
+      const vid = getVoterId();
       setVoterId(vid);
 
-      // Desserts
-      const dKeys = await window.storage.list('dessert:', true);
-      const dList = await Promise.all((dKeys.keys || []).map(async k => {
-        try { const r = await window.storage.get(k, true); return JSON.parse(r.value); }
-        catch { return null; }
-      }));
-      const cleanDesserts = dList.filter(Boolean).sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+      const cleanDesserts = await fetchDesserts();
       setDesserts(cleanDesserts);
 
-      // Votes
-      const vKeys = await window.storage.list('vote:', true);
-      const vList = await Promise.all((vKeys.keys || []).map(async k => {
-        try { const r = await window.storage.get(k, true); return JSON.parse(r.value); }
-        catch { return null; }
-      }));
+      const vList = await fetchVotes();
       const byDessert = {};
       const mine = {};
-      vList.filter(Boolean).forEach(v => {
+      vList.forEach(v => {
         if (!byDessert[v.dessertId]) byDessert[v.dessertId] = [];
         byDessert[v.dessertId].push(v);
         if (v.voterId === vid) mine[v.dessertId] = v;
@@ -168,10 +158,10 @@ export default function App() {
 
   const submitVote = async (dessertId, theme, flavor, comment) => {
     if (!voterId) return;
-    const voteKey = `vote:${dessertId}:${voterId}`;
     const voteData = { dessertId, voterId, theme, flavor, comment: comment.trim(), votedAt: Date.now() };
     try {
-      await window.storage.set(voteKey, JSON.stringify(voteData), true);
+      await saveVote(voteData);
+      markVotedLocal(dessertId);
       setVotes(prev => {
         const list = (prev[dessertId] || []).filter(v => v.voterId !== voterId);
         return { ...prev, [dessertId]: [...list, voteData] };
@@ -190,7 +180,7 @@ export default function App() {
     const id = 'd_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
     const dessert = { id, ...data, createdAt: Date.now() };
     try {
-      await window.storage.set(`dessert:${id}`, JSON.stringify(dessert), true);
+      await saveDessert(dessert);
       setDesserts(prev => [...prev, dessert]);
       setStatus({ type: 'success', msg: 'Entry added.' });
       setTimeout(() => setStatus(null), 2500);
@@ -204,12 +194,7 @@ export default function App() {
   const deleteDessert = async (id) => {
     if (!confirm('Delete this entry and all its votes?')) return;
     try {
-      await window.storage.delete(`dessert:${id}`, true);
-      // Clean up votes
-      const vKeys = await window.storage.list('vote:' + id + ':', true);
-      for (const k of (vKeys.keys || [])) {
-        try { await window.storage.delete(k, true); } catch {}
-      }
+      await deleteDessertById(id);
       await loadData();
     } catch {}
   };

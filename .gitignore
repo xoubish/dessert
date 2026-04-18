@@ -1,0 +1,13 @@
+node_modules
+dist
+.DS_Store
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
