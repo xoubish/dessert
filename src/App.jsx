@@ -292,7 +292,7 @@ export default function App() {
         {/* Header */}
         <header className="text-center mb-12">
           <div className="text-xs tracking-[0.4em] text-stone-600 uppercase mb-4">
-            Infrared Processing &amp; Analysis Center
+            IPAC
           </div>
           <div className="flex items-center justify-center gap-4 mb-2">
             <div className="h-px w-16 bg-stone-500"></div>
