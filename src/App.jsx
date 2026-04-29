@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, Plus, X, Check, ArrowLeft, Trophy, Upload, Trash2, RefreshCw, Sparkles } from 'lucide-react';
+import { Star, Plus, X, Check, ArrowLeft, Trophy, Upload, Trash2, RefreshCw, Sparkles, Pencil } from 'lucide-react';
 import {
   getVoterId,
   markVotedLocal,
@@ -199,6 +199,22 @@ export default function App() {
     } catch {}
   };
 
+  const editDessert = async (id, updates) => {
+    const existing = desserts.find(d => d.id === id);
+    if (!existing) return false;
+    const merged = { ...existing, ...updates, id };
+    try {
+      await saveDessert(merged);
+      setDesserts(prev => prev.map(d => d.id === id ? merged : d));
+      setStatus({ type: 'success', msg: 'Entry updated.' });
+      setTimeout(() => setStatus(null), 2500);
+      return true;
+    } catch {
+      setStatus({ type: 'error', msg: 'Could not save changes. Image might be too large.' });
+      return false;
+    }
+  };
+
   const selectedDessert = desserts.find(d => d.id === selectedId);
   const totalVotes = Object.values(votes).reduce((sum, arr) => sum + arr.length, 0);
   const myVoteCount = Object.keys(myVotes).length;
@@ -275,6 +291,7 @@ export default function App() {
       desserts={desserts}
       votes={votes}
       onAdd={addDessert}
+      onEdit={editDessert}
       onDelete={deleteDessert}
       onBack={() => setView('gallery')}
       onRefresh={loadData}
@@ -435,12 +452,9 @@ const DessertCard = ({ dessert, index, voteCount, myVote, onClick, baseFont, scr
         </div>
       </div>
       <div className="p-5">
-        <h3 style={{fontFamily: baseFont, color: '#2A1810'}} className="text-xl font-semibold leading-tight mb-1">
+        <h3 style={{fontFamily: baseFont, color: '#2A1810'}} className="text-xl font-semibold leading-tight mb-3">
           {dessert.name}
         </h3>
-        <div style={{fontFamily: scriptFont, color:'#7B1E1E'}} className="text-xl leading-tight mb-3">
-          by {dessert.baker}
-        </div>
         <div className="pt-3 border-t border-stone-300/80 flex items-center justify-between">
           {hasVoted ? (
             <div className="flex items-center gap-2 text-xs text-stone-600">
@@ -500,12 +514,9 @@ const VotePage = ({ dessert, existingVote, votes, onSubmit, onBack, baseFont, sc
             )}
           </div>
           <div className="p-6 md:p-10">
-            <h1 style={{color: '#2A1810'}} className="text-3xl md:text-4xl font-semibold leading-tight mb-2">
+            <h1 style={{color: '#2A1810'}} className="text-3xl md:text-4xl font-semibold leading-tight mb-6">
               {dessert.name}
             </h1>
-            <div style={{fontFamily: scriptFont, color:'#7B1E1E'}} className="text-2xl mb-6">
-              by {dessert.baker}
-            </div>
             {dessert.description && (
               <p className="text-stone-700 leading-relaxed italic text-lg mb-8 pb-8 border-b border-stone-300">
                 {dessert.description}
@@ -593,7 +604,7 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
       ...d,
       themeAvg,
       flavorAvg,
-      combined: themeAvg * 0.25 + flavorAvg * 0.75,
+      combined: (themeAvg + flavorAvg) / 2,
       voteCount: list.length,
       comments: list.filter(v => v.comment).map(v => v.comment),
       submissionNo: i + 1,
@@ -617,7 +628,7 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
             Standings
           </h1>
           <div style={{fontFamily: scriptFont, color:'#B8860B'}} className="text-2xl mt-2">
-            ranked by flavor (¾) &amp; theme (¼)
+            ranked by combined theme &amp; flavor
           </div>
         </div>
 
@@ -672,7 +683,7 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
 };
 
 // ---------- Admin Page ----------
-const AdminPage = ({ desserts, votes, onAdd, onDelete, onBack, onRefresh, baseFont, scriptFont, parchmentBg }) => {
+const AdminPage = ({ desserts, votes, onAdd, onEdit, onDelete, onBack, onRefresh, baseFont, scriptFont, parchmentBg }) => {
   const [name, setName] = useState('');
   const [baker, setBaker] = useState('');
   const [description, setDescription] = useState('');
@@ -784,24 +795,170 @@ const AdminPage = ({ desserts, votes, onAdd, onDelete, onBack, onRefresh, baseFo
         <h2 style={{color:'#2A1810'}} className="text-2xl font-semibold mb-4">Current entries ({desserts.length})</h2>
         <div className="space-y-3">
           {desserts.map((d, i) => (
-            <div key={d.id} className="flex items-center gap-4 bg-[#FAF5E8] border border-stone-400/60 rounded-sm p-3">
-              <div className="w-14 h-14 bg-stone-200 rounded-sm overflow-hidden flex-shrink-0">
-                {d.imageData && <img src={d.imageData} alt="" className="w-full h-full object-cover"/>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-stone-800 truncate">N<sup>o</sup> {String(i+1).padStart(2,'0')} · {d.name}</div>
-                <div style={{fontFamily: scriptFont, color:'#7B1E1E'}} className="text-lg leading-none">by {d.baker}</div>
-                <div className="text-xs text-stone-500 italic">{(votes[d.id] || []).length} ballots</div>
-              </div>
-              <button onClick={() => onDelete(d.id)} className="p-2 text-red-900 hover:bg-red-100 rounded-sm" title="Delete">
-                <Trash2 size={16}/>
-              </button>
-            </div>
+            <EntryRow
+              key={d.id}
+              dessert={d}
+              index={i}
+              ballots={(votes[d.id] || []).length}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              baseFont={baseFont}
+              scriptFont={scriptFont}
+            />
           ))}
           {desserts.length === 0 && (
             <div className="text-stone-500 italic text-center py-8">No entries yet.</div>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- Entry Row (with inline edit) ----------
+const EntryRow = ({ dessert, index, ballots, onEdit, onDelete, baseFont, scriptFont }) => {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(dessert.name);
+  const [baker, setBaker] = useState(dessert.baker);
+  const [description, setDescription] = useState(dessert.description || '');
+  const [imageData, setImageData] = useState(null); // null = keep existing
+  const [imageName, setImageName] = useState('');
+  const [imageErr, setImageErr] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setName(dessert.name);
+    setBaker(dessert.baker);
+    setDescription(dessert.description || '');
+    setImageData(null);
+    setImageName('');
+    setImageErr(null);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setImageData(null);
+    setImageName('');
+    setImageErr(null);
+  };
+
+  const handleImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageErr(null);
+    if (!file.type.startsWith('image/')) {
+      setImageErr('Please choose an image file.');
+      return;
+    }
+    try {
+      const resized = await resizeImage(file);
+      setImageData(resized);
+      setImageName(file.name);
+    } catch {
+      setImageErr('Could not process that image.');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim() || !baker.trim()) return;
+    setSaving(true);
+    const updates = {
+      name: name.trim(),
+      baker: baker.trim(),
+      description: description.trim(),
+    };
+    if (imageData) updates.imageData = imageData;
+    const ok = await onEdit(dessert.id, updates);
+    setSaving(false);
+    if (ok) cancelEdit();
+  };
+
+  const previewSrc = imageData || dessert.imageData;
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-4 bg-[#FAF5E8] border border-stone-400/60 rounded-sm p-3">
+        <div className="w-14 h-14 bg-stone-200 rounded-sm overflow-hidden flex-shrink-0">
+          {dessert.imageData && <img src={dessert.imageData} alt="" className="w-full h-full object-cover"/>}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-stone-800 truncate">N<sup>o</sup> {String(index+1).padStart(2,'0')} · {dessert.name}</div>
+          <div style={{fontFamily: scriptFont, color:'#7B1E1E'}} className="text-lg leading-none">by {dessert.baker}</div>
+          <div className="text-xs text-stone-500 italic">{ballots} ballots</div>
+        </div>
+        <button onClick={startEdit} className="p-2 text-stone-700 hover:bg-stone-200 rounded-sm" title="Edit">
+          <Pencil size={16}/>
+        </button>
+        <button onClick={() => onDelete(dessert.id)} className="p-2 text-red-900 hover:bg-red-100 rounded-sm" title="Delete">
+          <Trash2 size={16}/>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#FAF5E8] border border-amber-700/60 rounded-sm p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-16 h-16 bg-stone-200 rounded-sm overflow-hidden flex-shrink-0">
+          {previewSrc && <img src={previewSrc} alt="" className="w-full h-full object-cover"/>}
+        </div>
+        <div className="text-xs text-stone-600 italic">
+          Editing N<sup>o</sup> {String(index+1).padStart(2,'0')} · {ballots} ballots will be preserved.
+        </div>
+      </div>
+      <div>
+        <label className="text-xs tracking-[0.25em] uppercase text-stone-700 block mb-1">Dessert Name</label>
+        <input
+          value={name} onChange={e => setName(e.target.value)}
+          className="w-full px-3 py-2 bg-[#F0E4CE] border border-stone-400/70 rounded-sm focus:border-amber-700 focus:outline-none"
+          style={{fontFamily: baseFont}}
+        />
+      </div>
+      <div>
+        <label className="text-xs tracking-[0.25em] uppercase text-stone-700 block mb-1">Baker</label>
+        <input
+          value={baker} onChange={e => setBaker(e.target.value)}
+          className="w-full px-3 py-2 bg-[#F0E4CE] border border-stone-400/70 rounded-sm focus:border-amber-700 focus:outline-none"
+          style={{fontFamily: baseFont}}
+        />
+      </div>
+      <div>
+        <label className="text-xs tracking-[0.25em] uppercase text-stone-700 block mb-1">Description</label>
+        <textarea
+          value={description} onChange={e => setDescription(e.target.value)}
+          className="w-full h-20 px-3 py-2 bg-[#F0E4CE] border border-stone-400/70 rounded-sm focus:border-amber-700 focus:outline-none italic"
+          style={{fontFamily: baseFont}}
+        />
+      </div>
+      <div>
+        <label className="text-xs tracking-[0.25em] uppercase text-stone-700 block mb-1">Photo</label>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="px-3 py-2 bg-stone-700 text-amber-50 rounded-sm cursor-pointer hover:bg-stone-800 tracking-wider uppercase text-xs flex items-center gap-2">
+            <Upload size={14}/>
+            {imageData ? 'Replace Again' : 'Replace Photo'}
+            <input type="file" accept="image/*" onChange={handleImage} className="hidden"/>
+          </label>
+          {imageName && <span className="text-sm text-stone-700 italic truncate max-w-[12rem]">{imageName}</span>}
+          {!imageData && <span className="text-xs text-stone-500 italic">Leave blank to keep current photo.</span>}
+        </div>
+        {imageErr && <div className="text-sm text-red-800 mt-2">{imageErr}</div>}
+      </div>
+      <div className="flex gap-2 pt-2">
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim() || !baker.trim()}
+          className="flex-1 py-2 bg-red-900 hover:bg-red-800 disabled:bg-stone-400 text-amber-50 tracking-[0.2em] uppercase text-sm rounded-sm"
+        >
+          {saving ? 'Saving…' : 'Save Changes'}
+        </button>
+        <button
+          onClick={cancelEdit}
+          disabled={saving}
+          className="px-5 py-2 border border-stone-500 text-stone-700 hover:bg-stone-200 tracking-[0.2em] uppercase text-sm rounded-sm"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
