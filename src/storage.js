@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
@@ -66,4 +67,14 @@ export const deleteDessertById = async (id) => {
   const q = query(collection(db, 'votes'), where('dessertId', '==', id));
   const snap = await getDocs(q);
   await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+};
+
+export const fetchVotingOpen = async () => {
+  const snap = await getDoc(doc(db, 'settings', 'voting'));
+  if (!snap.exists()) return true;
+  return snap.data().open !== false;
+};
+
+export const setVotingOpen = async (open) => {
+  await setDoc(doc(db, 'settings', 'voting'), { open: !!open });
 };

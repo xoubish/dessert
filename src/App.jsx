@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, Plus, X, Check, ArrowLeft, Trophy, Upload, Trash2, RefreshCw, Sparkles, Pencil } from 'lucide-react';
+import { Star, Plus, X, Check, ArrowLeft, Trophy, Upload, Trash2, RefreshCw, Sparkles, Pencil, Lock, Unlock } from 'lucide-react';
 import {
   getVoterId,
   markVotedLocal,
@@ -8,6 +8,8 @@ import {
   saveDessert,
   saveVote,
   deleteDessertById,
+  fetchVotingOpen,
+  setVotingOpen,
 } from './storage';
 
 // ---------- Helpers ----------
@@ -111,6 +113,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [status, setStatus] = useState(null);
+  const [votingOpen, setVotingOpenState] = useState(true);
 
   // Admin via URL: ?admin=spherex
   useEffect(() => {
@@ -138,6 +141,9 @@ export default function App() {
       const cleanDesserts = await fetchDesserts();
       setDesserts(cleanDesserts);
 
+      const open = await fetchVotingOpen();
+      setVotingOpenState(open);
+
       const vList = await fetchVotes();
       const byDessert = {};
       const mine = {};
@@ -158,6 +164,11 @@ export default function App() {
 
   const submitVote = async (dessertId, theme, flavor, comment) => {
     if (!voterId) return;
+    if (!votingOpen) {
+      setStatus({ type: 'error', msg: 'Voting is closed.' });
+      setTimeout(() => setStatus(null), 2500);
+      return false;
+    }
     const voteData = { dessertId, voterId, theme, flavor, comment: comment.trim(), votedAt: Date.now() };
     try {
       await saveVote(voteData);
@@ -197,6 +208,18 @@ export default function App() {
       await deleteDessertById(id);
       await loadData();
     } catch {}
+  };
+
+  const toggleVoting = async () => {
+    const next = !votingOpen;
+    try {
+      await setVotingOpen(next);
+      setVotingOpenState(next);
+      setStatus({ type: 'success', msg: next ? 'Voting opened.' : 'Voting closed.' });
+      setTimeout(() => setStatus(null), 2500);
+    } catch {
+      setStatus({ type: 'error', msg: 'Could not change voting status.' });
+    }
   };
 
   const editDessert = async (id, updates) => {
@@ -264,6 +287,7 @@ export default function App() {
       dessert={selectedDessert}
       existingVote={myVotes[selectedDessert.id]}
       votes={votes[selectedDessert.id] || []}
+      votingOpen={votingOpen}
       onSubmit={submitVote}
       onBack={() => { setView('gallery'); setSelectedId(null); }}
       baseFont={baseFont}
@@ -290,6 +314,8 @@ export default function App() {
     return <AdminPage
       desserts={desserts}
       votes={votes}
+      votingOpen={votingOpen}
+      onToggleVoting={toggleVoting}
       onAdd={addDessert}
       onEdit={editDessert}
       onDelete={deleteDessert}
@@ -352,10 +378,20 @@ export default function App() {
           <Stat label="Yours" value={`${myVoteCount}/${desserts.length}`} scriptFont={scriptFont}/>
         </div>
 
+        {/* Voting closed banner */}
+        {!votingOpen && (
+          <div className="max-w-2xl mx-auto mb-8 px-5 py-4 border border-stone-500/60 bg-[#FAF5E8] rounded-sm flex items-center justify-center gap-3 text-stone-700">
+            <Lock size={16} className="text-red-900"/>
+            <span className="tracking-[0.2em] uppercase text-xs">Voting is closed</span>
+            <span className="text-stone-400">·</span>
+            <span className="italic text-sm">the people have spoken</span>
+          </div>
+        )}
+
         {/* Buttons row */}
-        {(hasVotedAny || isAdmin) && (
+        {(hasVotedAny || isAdmin || !votingOpen) && (
           <div className="flex justify-center gap-3 mb-8 flex-wrap">
-            {hasVotedAny && (
+            {(hasVotedAny || !votingOpen) && (
               <button
                 onClick={() => setView('results')}
                 className="px-5 py-2 border-2 border-amber-700 text-amber-800 hover:bg-amber-700 hover:text-amber-50 transition-all rounded-sm flex items-center gap-2 text-sm tracking-wider uppercase"
@@ -476,7 +512,7 @@ const DessertCard = ({ dessert, index, voteCount, myVote, onClick, baseFont, scr
 };
 
 // ---------- Vote Page ----------
-const VotePage = ({ dessert, existingVote, votes, onSubmit, onBack, baseFont, scriptFont, parchmentBg }) => {
+const VotePage = ({ dessert, existingVote, votes, votingOpen, onSubmit, onBack, baseFont, scriptFont, parchmentBg }) => {
   const [theme, setTheme] = useState(existingVote?.theme ?? 0);
   const [flavor, setFlavor] = useState(existingVote?.flavor ?? 0);
   const [comment, setComment] = useState(existingVote?.comment ?? '');
@@ -496,7 +532,7 @@ const VotePage = ({ dessert, existingVote, votes, onSubmit, onBack, baseFont, sc
 
   const crowdTheme = votes.length ? avg(votes.map(v => v.theme)) : 0;
   const crowdFlavor = votes.length ? avg(votes.map(v => v.flavor)) : 0;
-  const showResults = !!existingVote;
+  const showResults = !!existingVote || !votingOpen;
 
   return (
     <div style={{ ...parchmentBg, fontFamily: baseFont }} className="min-h-screen">
@@ -523,12 +559,22 @@ const VotePage = ({ dessert, existingVote, votes, onSubmit, onBack, baseFont, sc
               </p>
             )}
 
+            {/* Closed banner */}
+            {!votingOpen && (
+              <div className="mb-6 px-4 py-3 border border-stone-500/60 bg-[#F0E4CE] rounded-sm flex items-center gap-3 text-sm text-stone-700">
+                <Lock size={16} className="text-red-900"/>
+                <span className="italic">
+                  Voting is closed. {existingVote ? 'Your ballot is preserved below.' : 'See the people’s verdict for the final standings.'}
+                </span>
+              </div>
+            )}
+
             {/* Rating */}
             <div className="space-y-8">
               <RatingBlock label="Theme" sub="How well does it evoke Forty & Festive?"
-                value={theme} onChange={setTheme} baseFont={baseFont}/>
+                value={theme} onChange={setTheme} baseFont={baseFont} readonly={!votingOpen}/>
               <RatingBlock label="Flavor" sub="Does it taste as good as it looks?"
-                value={flavor} onChange={setFlavor} baseFont={baseFont}/>
+                value={flavor} onChange={setFlavor} baseFont={baseFont} readonly={!votingOpen}/>
 
               <div>
                 <div className="flex items-baseline justify-between mb-2">
@@ -539,20 +585,29 @@ const VotePage = ({ dessert, existingVote, votes, onSubmit, onBack, baseFont, sc
                   value={comment}
                   onChange={e => setComment(e.target.value)}
                   placeholder="Any thoughts? Write a little review — like you're telling a friend why this one stuck with you."
-                  className="w-full h-28 px-4 py-3 bg-[#F0E4CE] border border-stone-400/70 rounded-sm focus:border-amber-700 focus:outline-none text-stone-800 italic"
+                  className="w-full h-28 px-4 py-3 bg-[#F0E4CE] border border-stone-400/70 rounded-sm focus:border-amber-700 focus:outline-none text-stone-800 italic disabled:opacity-70"
                   style={{fontFamily: baseFont}}
                   maxLength={500}
+                  disabled={!votingOpen}
                 />
                 <div className="text-xs text-stone-500 text-right mt-1">{comment.length}/500</div>
               </div>
 
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || (theme === 0 && flavor === 0 && !comment.trim())}
-                className="w-full py-4 bg-red-900 hover:bg-red-800 disabled:bg-stone-400 disabled:cursor-not-allowed text-amber-50 tracking-[0.3em] uppercase text-sm transition-colors rounded-sm"
-              >
-                {submitting ? 'Saving…' : justSubmitted ? 'Thank you ✓' : existingVote ? 'Update Ballot' : 'Cast Ballot'}
-              </button>
+              {votingOpen ? (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || (theme === 0 && flavor === 0 && !comment.trim())}
+                  className="w-full py-4 bg-red-900 hover:bg-red-800 disabled:bg-stone-400 disabled:cursor-not-allowed text-amber-50 tracking-[0.3em] uppercase text-sm transition-colors rounded-sm"
+                >
+                  {submitting ? 'Saving…' : justSubmitted ? 'Thank you ✓' : existingVote ? 'Update Ballot' : 'Cast Ballot'}
+                </button>
+              ) : (
+                <div
+                  className="w-full py-4 bg-stone-400 text-amber-50 tracking-[0.3em] uppercase text-sm rounded-sm text-center cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <Lock size={14}/> Voting Closed
+                </div>
+              )}
             </div>
 
             {/* Crowd averages — only after voting */}
@@ -575,7 +630,7 @@ const VotePage = ({ dessert, existingVote, votes, onSubmit, onBack, baseFont, sc
   );
 };
 
-const RatingBlock = ({ label, sub, value, onChange, baseFont }) => (
+const RatingBlock = ({ label, sub, value, onChange, baseFont, readonly = false }) => (
   <div>
     <div className="flex items-baseline justify-between mb-3">
       <div>
@@ -583,7 +638,7 @@ const RatingBlock = ({ label, sub, value, onChange, baseFont }) => (
         <div className="text-xs italic text-stone-500 mt-0.5">{sub}</div>
       </div>
     </div>
-    <StarRow value={value} onChange={onChange} size={36}/>
+    <StarRow value={value} onChange={onChange} size={36} readonly={readonly}/>
   </div>
 );
 
@@ -683,7 +738,7 @@ const ResultsPage = ({ desserts, votes, myVotes, onBack, baseFont, scriptFont, p
 };
 
 // ---------- Admin Page ----------
-const AdminPage = ({ desserts, votes, onAdd, onEdit, onDelete, onBack, onRefresh, baseFont, scriptFont, parchmentBg }) => {
+const AdminPage = ({ desserts, votes, votingOpen, onToggleVoting, onAdd, onEdit, onDelete, onBack, onRefresh, baseFont, scriptFont, parchmentBg }) => {
   const [name, setName] = useState('');
   const [baker, setBaker] = useState('');
   const [description, setDescription] = useState('');
@@ -737,7 +792,37 @@ const AdminPage = ({ desserts, votes, onAdd, onEdit, onDelete, onBack, onRefresh
         </div>
 
         <h1 style={{color:'#7B1E1E'}} className="text-4xl font-semibold italic mb-2">Manage Entries</h1>
-        <p className="text-stone-600 text-sm italic mb-8">Add each dessert as it arrives. Keep images under ~3MB.</p>
+        <p className="text-stone-600 text-sm italic mb-6">Add each dessert as it arrives. Keep images under ~3MB.</p>
+
+        {/* Voting open/closed toggle */}
+        <div className="bg-[#FAF5E8] border border-stone-400/60 rounded-sm p-4 mb-8 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            {votingOpen ? <Unlock size={18} className="text-green-800"/> : <Lock size={18} className="text-red-900"/>}
+            <div>
+              <div className="text-sm tracking-[0.2em] uppercase text-stone-700">
+                Voting is {votingOpen ? 'open' : 'closed'}
+              </div>
+              <div className="text-xs italic text-stone-500 mt-0.5">
+                {votingOpen
+                  ? 'Anyone can cast or update a ballot.'
+                  : 'Ballots are locked. Standings are public to everyone.'}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (votingOpen && !confirm('Close voting? Existing ballots are kept and standings become public.')) return;
+              onToggleVoting();
+            }}
+            className={`px-5 py-2 rounded-sm tracking-[0.2em] uppercase text-xs flex items-center gap-2 transition-colors ${
+              votingOpen
+                ? 'bg-red-900 hover:bg-red-800 text-amber-50'
+                : 'bg-green-900 hover:bg-green-800 text-amber-50'
+            }`}
+          >
+            {votingOpen ? <><Lock size={14}/> Close Voting</> : <><Unlock size={14}/> Reopen Voting</>}
+          </button>
+        </div>
 
         <div className="bg-[#FAF5E8] border border-stone-400/60 rounded-sm p-6 mb-10 space-y-4">
           <div>
